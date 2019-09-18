@@ -195,10 +195,11 @@ func GetVAByID(id string) (VirtualAccount, error) {
 
 func SaveVA(va VirtualAccount) error {
 	sql := `INSERT INTO virtual_accounts
-	(id, vendor_id, bank_code, is_closed, expected_amount, external_id, account_number, "name", expiration_date, status)
+	(id, bank_code, is_closed, expected_amount, external_id, account_number, "name", expiration_date, status)
 	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);`
 
 	_, err := db.Exec(sql,
+		va.ID,
 		va.BankCode,
 		va.IsClosed,
 		va.ExpectedAmount,
