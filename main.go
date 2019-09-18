@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -13,17 +11,23 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"os"
+
+	"github.com/joho/godotenv"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 var db *sql.DB
 var Nil uuid.UUID
 
 func main() {
-	connStr := "postgres://postgres:postgres@localhost:5432/bopay?sslmode=disable"
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
-	var err error
+	connStr := os.Getenv("DB_URI")
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
 		panic(err)
@@ -37,9 +41,8 @@ func main() {
 	e.Use(middleware.Recover())
 
 	// Routes
-	e.GET("/", hello)
-	e.POST("/virtual-accounts", CreateVA)
-	e.GET("/virtual-accounts/:id", CreateVA)
+	// e.POST("/virtual-accounts", CreateVA)
+	// e.GET("/virtual-accounts/:id", CreateVA)
 
 	e.POST("/callbacks/virtual-accounts", UpdateVACallback)
 
@@ -52,12 +55,8 @@ func hello(c echo.Context) error {
 	return c.String(http.StatusOK, "Hello, World!")
 }
 
-// xnd_development_MQNd9vuNdLb7KNDkjTFjnIn6lA2xGRzzyaJ5eT6BsWIjFJwHxcMhNv715lnZO
-// xnd_production_CHl4ZK4ONhyfMA7HN8VS6XHYsZ0UCBGHQ3seXjzGKcyeIgdHXucRb4PnyjT7E
-
 type VirtualAccount struct {
-	ID             string     `json:"id,omitempty"`        // will be empty when requesting
-	VendorID       string     `json:"vendor_id,omitempty"` // will be empty when requesting
+	ID             string     `json:"id,omitempty"` // will be empty when requesting
 	BankCode       string     `json:"bank_code"`
 	IsClosed       bool       `json:"is_closed,omitempty"`       // might be empty when requesting
 	ExpectedAmount int32      `json:"expected_amount,omitempty"` // might be empty when requesting
@@ -70,69 +69,87 @@ type VirtualAccount struct {
 	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
 }
 
-func GetVA(c echo.Context) error {
-	id := c.QueryParam("id")
+// func GetVA(c echo.Context) error {
+// 	id := c.QueryParam("id")
 
-	va, err := GetVAByID(id)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+// 	va, err := GetVAByID(id)
+// 	if err != nil {
+// 		return c.JSON(http.StatusInternalServerError, err)
+// 	}
 
-	return c.JSON(http.StatusOK, va)
-}
+// 	return c.JSON(http.StatusOK, va)
+// }
 
-func CreateVA(c echo.Context) error {
-	va := &VirtualAccount{}
+// func CreateVA(c echo.Context) error {
+// 	va := &VirtualAccount{}
 
-	if err := c.Bind(va); err != nil {
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+// 	if err := c.Bind(va); err != nil {
+// 		return c.JSON(http.StatusInternalServerError, err)
+// 	}
 
-	id, err := SaveVA(*va)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+// 	id, err := SaveVA(*va)
+// 	if err != nil {
+// 		return c.JSON(http.StatusInternalServerError, err)
+// 	}
 
-	jsonBody, err := json.Marshal(va)
-	if err != nil {
-		log.Print(err)
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+// 	jsonBody, err := json.Marshal(va)
+// 	if err != nil {
+// 		log.Print(err)
+// 		return c.JSON(http.StatusInternalServerError, err)
+// 	}
 
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", "https://api.xendit.co/callback_virtual_accounts", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		log.Print(err)
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+// 	res, err := SendRequest("POST", "callback_virtual_accounts", jsonBody)
+// 	if err != nil {
+// 		log.Print(err)
+// 		return c.JSON(http.StatusInternalServerError, err)
+// 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth("xnd_production_CHl4ZK4ONhyfMA7HN8VS6XHYsZ0UCBGHQ3seXjzGKcyeIgdHXucRb4PnyjT7E", "")
-	res, err := client.Do(req)
-	if err != nil {
-		log.Print(err)
-		return c.JSON(http.StatusInternalServerError, err)
-	}
-	defer res.Body.Close()
+// 	var jsonResponse VirtualAccount
+// 	json.Unmarshal(res, &jsonResponse)
 
-	var jsonResponse VirtualAccount
+// 	err = UpdateVAByID(id, VirtualAccount{
+// 		IsClosed:       jsonResponse.IsClosed,
+// 		AccountNumber:  jsonResponse.AccountNumber,
+// 		ExpirationDate: jsonResponse.ExpirationDate,
+// 		Status:         jsonResponse.Status,
+// 		VendorID:       jsonResponse.ID,
+// 	})
+// 	if err != nil {
+// 		log.Print(err)
+// 		return c.JSON(http.StatusInternalServerError, err)
+// 	}
 
-	json.NewDecoder(res.Body).Decode(&jsonResponse)
+// 	return c.JSON(http.StatusCreated, va)
+// }
 
-	err = UpdateVAByID(id, VirtualAccount{
-		IsClosed:       jsonResponse.IsClosed,
-		AccountNumber:  jsonResponse.AccountNumber,
-		ExpirationDate: jsonResponse.ExpirationDate,
-		Status:         jsonResponse.Status,
-		VendorID:       jsonResponse.ID,
-	})
-	if err != nil {
-		log.Print(err)
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+// func SendRequest(method string, endpoint string, body []byte) ([]byte, error) {
+// 	baseUrl := os.Getenv("BASE_VENDOR_URL")
+// 	apiKey := os.Getenv("API_KEY")
 
-	return c.JSON(http.StatusCreated, va)
-}
+// 	client := &http.Client{}
+// 	req, err := http.NewRequest(method, baseUrl+endpoint, bytes.NewBuffer(body))
+// 	if err != nil {
+// 		log.Print(err)
+// 		return nil, err
+// 	}
+
+// 	req.Header.Set("Content-Type", "application/json")
+// 	req.SetBasicAuth(apiKey, "")
+// 	res, err := client.Do(req)
+// 	if err != nil {
+// 		log.Print(err)
+// 		return nil, err
+// 	}
+// 	defer res.Body.Close()
+
+// 	byteRes, err := ioutil.ReadAll(res.Body)
+// 	if err != nil {
+// 		log.Print(err)
+// 		return nil, err
+// 	}
+
+// 	return byteRes, nil
+// }
 
 func UpdateVACallback(c echo.Context) error {
 	va := new(VirtualAccount)
@@ -141,10 +158,7 @@ func UpdateVACallback(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	err := UpdateVAByVendorID(VirtualAccount{
-		Status:   va.Status,
-		VendorID: va.VendorID,
-	})
+	err := SaveVA(*va)
 	if err != nil {
 		log.Print(err)
 		return c.JSON(http.StatusInternalServerError, err)
@@ -156,12 +170,11 @@ func UpdateVACallback(c echo.Context) error {
 func GetVAByID(id string) (VirtualAccount, error) {
 	va := VirtualAccount{}
 
-	sql := `SELECT id, vendor_id, bank_code, is_closed, expected_amount, external_id, account_number, "name", expiration_date, status 
+	sql := `SELECT id, bank_code, is_closed, expected_amount, external_id, account_number, "name", expiration_date, status 
 	FROM virtual_accounts WHERE id = $1`
 
 	row := db.QueryRow(sql, id)
 	err := row.Scan(&va.ID,
-		&va.VendorID,
 		&va.BankCode,
 		&va.IsClosed,
 		&va.ExpectedAmount,
@@ -180,19 +193,12 @@ func GetVAByID(id string) (VirtualAccount, error) {
 
 }
 
-func SaveVA(va VirtualAccount) (uuid.UUID, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		log.Print(err)
-		return Nil, err
-	}
-
+func SaveVA(va VirtualAccount) error {
 	sql := `INSERT INTO virtual_accounts
-	(id, bank_code, is_closed, expected_amount, external_id, account_number, "name", expiration_date, status)
+	(id, vendor_id, bank_code, is_closed, expected_amount, external_id, account_number, "name", expiration_date, status)
 	VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);`
 
-	_, err = db.Exec(sql,
-		id,
+	_, err := db.Exec(sql,
 		va.BankCode,
 		va.IsClosed,
 		va.ExpectedAmount,
@@ -204,50 +210,50 @@ func SaveVA(va VirtualAccount) (uuid.UUID, error) {
 
 	if err != nil {
 		log.Print(err)
-		return Nil, err
+		return err
 	}
 
-	return id, nil
+	return nil
 }
 
-func UpdateVAByID(id uuid.UUID, va VirtualAccount) (err error) {
-	sql := `UPDATE virtual_accounts SET
-	is_closed = $1,
-	account_number = $2,
-	expiration_date = $3,
-	status = $4,
-	vendor_id = $5,
-	updated_at = now()
-	WHERE id = $6;`
+// func UpdateVAByID(id uuid.UUID, va VirtualAccount) (err error) {
+// 	sql := `UPDATE virtual_accounts SET
+// 	is_closed = $1,
+// 	account_number = $2,
+// 	expiration_date = $3,
+// 	status = $4,
+// 	vendor_id = $5,
+// 	updated_at = now()
+// 	WHERE id = $6;`
 
-	_, err = db.Exec(sql,
-		va.IsClosed,
-		va.AccountNumber,
-		va.ExpirationDate,
-		va.Status,
-		va.VendorID,
-		id)
+// 	_, err = db.Exec(sql,
+// 		va.IsClosed,
+// 		va.AccountNumber,
+// 		va.ExpirationDate,
+// 		va.Status,
+// 		va.VendorID,
+// 		id)
 
-	if err != nil {
-		log.Print(err)
-		return
-	}
+// 	if err != nil {
+// 		log.Print(err)
+// 		return
+// 	}
 
-	return
-}
+// 	return
+// }
 
-func UpdateVAByVendorID(va VirtualAccount) (err error) {
-	sql := `UPDATE virtual_accounts SET
-	status = $1,
-	updated_at = now()
-	WHERE vendor_id = $2;`
+// func UpdateVAByVendorID(va VirtualAccount) (err error) {
+// 	sql := `UPDATE virtual_accounts SET
+// 	status = $1,
+// 	updated_at = now()
+// 	WHERE vendor_id = $2;`
 
-	_, err = db.Exec(sql, va.Status, va.VendorID)
+// 	_, err = db.Exec(sql, va.Status, va.VendorID)
 
-	if err != nil {
-		log.Print(err)
-		return
-	}
+// 	if err != nil {
+// 		log.Print(err)
+// 		return
+// 	}
 
-	return
-}
+// 	return
+// }
