@@ -3,10 +3,7 @@ package main
 import (
 	"database/sql"
 
-	"github.com/gofrs/uuid"
-
 	"log"
-	"net/http"
 
 	_ "github.com/lib/pq"
 
@@ -16,8 +13,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	"github.com/edwinyoyada/bopay/models"
-	"github.com/edwinyoyada/bopay/repositories"
+	r "github.com/edwinyoyada/bopay/repositories"
 	"github.com/edwinyoyada/bopay/services"
 	"github.com/edwinyoyada/bopay/controllers"
 )
@@ -43,9 +39,9 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	VARepo := repositories.NewVARepo(db)
+	VARepo := r.NewVARepo(db)
 	VAService := services.NewVAService(VARepo)
-	VAController := services.NewVAController(VAService)
+	VAController := controllers.NewVAController(VAService)
 
 	e.POST("/callbacks/virtual-accounts", VAController.UpdateVACallback)
 

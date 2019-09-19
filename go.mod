@@ -1,4 +1,4 @@
-module bopay
+module github.com/edwinyoyada/bopay
 
 go 1.13
 
