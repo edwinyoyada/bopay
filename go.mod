@@ -3,7 +3,7 @@ module github.com/edwinyoyada/bopay
 go 1.13
 
 require (
-	github.com/gofrs/uuid v3.2.0+incompatible
+	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/joho/godotenv v1.3.0
